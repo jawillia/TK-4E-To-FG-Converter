@@ -6,8 +6,8 @@ Module Name: DnD4eCharacterBuilderToFGConverterTool.py
 Description: Provides the front-end desktop UI to convert Character Builder/CBLoader .dnd4e files 
                 to xml files for Fantasy Grounds
 Author: Jason Williams
-Date: 2025-02-19
-Version: 0.1
+Date: 2025-06-22
+Version: 0.2
 """
 
 from tkinter import *

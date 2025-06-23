@@ -2,6 +2,14 @@ import xml.etree.ElementTree as ET
 import sys
 import re as regularExpression
 
+class RacialTrait():
+	def __init__(self, internal_id, traitName, race, shortdescription):
+		self.internal_id = internal_id
+		self.traitName = traitName
+		self.race = race
+		self.shortdescription = shortdescription
+		self.fullDescription = ""
+
 class ClassFeature():
 	def __init__(self, featureName, shortdescription, level):
 		self.featureName = featureName
@@ -67,7 +75,7 @@ class Skill():
 class Character():
 	def __init__(self, characterName=None, className=None, level=None, levelBonus=None, player=None, height=None, weight=None,
 		gender=None,age=None,alignment=None,company=None,portrait=None,experience=None,experienceNeeded=None,carriedMoney=None,
-		storedMoney=None,traits=None,appearance=None,companions=None,strength=None,dexterity=None,constitution=None,
+		storedMoney=None,traits=None,appearance=None,companions=None,notes=None,strength=None,dexterity=None,constitution=None,
 		wisdom=None,intelligence=None,charisma=None,strengthModifier=None,dexterityModifier=None,constitutionModifier=None,
 		wisdomModifier=None,intelligenceModifier=None,charismaModifier=None):
 		self.characterName = characterName
@@ -89,6 +97,7 @@ class Character():
 		self.traits = traits
 		self.appearance = appearance
 		self.companions = companions
+		self.notes = notes
 		self.strength = strength
 		self.dexterity = dexterity
 		self.constitution = constitution
@@ -129,6 +138,7 @@ class Character():
 		self.skillList = []
 		self.featList = []
 		self.classFeatureList = []
+		self.racialTraitList = []
 
 	def appendInventory(self, value):
 		self.inventoryList.append(value)
@@ -144,6 +154,9 @@ class Character():
 
 	def appendClassFeature(self, value):
 		self.classFeatureList.append(value)
+
+	def appendRacialTrait(self, value):
+		self.racialTraitList.append(value)
 
 
 #Reading from .dnd4e file
@@ -172,9 +185,11 @@ def readCBLoaderCharacterFile(filename):
 	character.player = detailSection.find(".//Player").text.strip()
 	character.height = detailSection.find(".//Height").text.strip()
 	character.weight = detailSection.find(".//Weight").text.strip()
-	character.gender = detailSection.find(".//Gender").text.strip()
+	#This doesn't work. Have to get the gender from a different section
+	#character.gender = detailSection.find(".//Gender").text.strip()
 	character.age = detailSection.find(".//Age").text.strip()
-	character.alignment = detailSection.find(".//Alignment").text.strip()
+	#This doesn't work. Have to get the alignnment from a different section.
+	#character.alignment = detailSection.find(".//Alignment").text.strip()
 	character.comapany = detailSection.find(".//Company").text.strip()
 	character.portrait = detailSection.find(".//Portrait").text.strip()
 	character.experience = detailSection.find(".//Experience").text.strip()
@@ -183,6 +198,7 @@ def readCBLoaderCharacterFile(filename):
 	character.traits = detailSection.find(".//Traits").text.strip()
 	character.appearance = detailSection.find(".//Appearance").text.strip()
 	character.companions = detailSection.find(".//Companions").text.strip()
+	character.notes = detailSection.find(".//Notes").text.strip()
 
 	#Class
 	classElement = rulesElementTallySection.find(".//RulesElement[@type='Class']")
@@ -273,6 +289,16 @@ def readCBLoaderCharacterFile(filename):
 
 	#Feats
 	character.featsListRulesElements = rulesElementTallySection.findall(".//RulesElement[@type='Feat']")
+
+	#Gender
+	genderRulesElement = rulesElementTallySection.find(".//RulesElement[@type='Gender']")
+	if genderRulesElement is not None:
+		character.gender = genderRulesElement.get("name");
+
+	#Alignment
+	alignmentElement = rulesElementTallySection.find(".//RulesElement[@type='Alignment']")
+	if alignmentElement is not None:
+		character.alignment = alignmentElement.get("name")		
 
 	#HP
 	for stat in statBlocksSection.findall("Stat"):
@@ -369,6 +395,7 @@ def readCBLoaderCharacterFile(filename):
 		character.appendSkill(skill)
 
 	#Special Abilities
+	#Class Features
 	classFeatureElementSection = rulesElementTallySection.findall(".//RulesElement[@type='Class Feature']")
 	for classFeatureElement in classFeatureElementSection:
 		classFeatureName = classFeatureElement.get("name")
@@ -378,6 +405,17 @@ def readCBLoaderCharacterFile(filename):
 			classFeatureShortDescription = classFeatureShortDescriptionElement.text.strip() if classFeatureShortDescriptionElement.text is not None else ""
 		classFeature = ClassFeature(classFeatureName, classFeatureShortDescription, "1")
 		character.appendClassFeature(classFeature)
+	#Racial Traits
+	racialTraitElementSection = rulesElementTallySection.findall(".//RulesElement[@type='Racial Trait']")
+	for racialTraitElement in racialTraitElementSection:
+		racialTraitID = racialTraitElement.get("internal-id")
+		racialTraitName = racialTraitElement.get("name")
+		racialTraitShortDescription = ""
+		racialTraitShortDescriptionElement = racialTraitElement.find(".//specific[@name='Short Description']")
+		if racialTraitShortDescriptionElement is not None:
+			racialTraitShortDescription = racialTraitShortDescriptionElement.text.strip() if racialTraitShortDescriptionElement.text is not None else ""
+		racialTrait = RacialTrait(racialTraitID, racialTraitName, None, racialTraitShortDescription)
+		character.appendRacialTrait(racialTrait)
 
 	#Speed
 	for stat in statBlocksSection.findall("Stat"):
@@ -587,6 +625,7 @@ def readCBLoaderMainFile(character, mergedFileLocation = None):
 				characterPower.source = powerSource
 
 	#Special Ability
+	#Class Features
 	for classFeature in character.classFeatureList:
 		classFeatureRulesElement = root.find(".//RulesElement[@name=\""+ classFeature.featureName + "\"][@type='Class Feature']")
 		if classFeatureRulesElement is not None:
@@ -610,6 +649,33 @@ def readCBLoaderMainFile(character, mergedFileLocation = None):
 								subFeatureShortDescription = subFeatureShortDescriptionElement.text.strip() if subFeatureShortDescriptionElement.text is not None else ""
 								if subFeatureShortDescription != None and subFeatureShortDescription != "":
 									classFeature.fullDescription = classFeature.fullDescription + subFeatureShortDescription + "\\n\\n"	
+	#Racial Traits
+	for racialTrait in character.racialTraitList:
+		racialTraitRulesElement = root.find(".//RulesElement[@name=\"" + racialTrait.traitName + "\"][@type='Racial Trait']")
+		if racialTraitRulesElement is not None:
+			racialTraitRace = ""
+			racialTraitFullDescription = ""
+			#Race
+			#grantedRacialFeaturesElement = root.find(".//RulesElement[@internal-id=\"" + racialTrait.internal_id + "\"][@type='Grants']")
+			#Description
+			racialTraitFullDescription = racialTraitRulesElement[-1].tail
+			if racialTraitFullDescription != None and racialTraitFullDescription != "":
+				racialTrait.fullDescription = racialTrait.fullDescription + racialTraitFullDescription + "\\n\\n"
+			#Sub-Features
+			racialTraitSubFeatureElement = racialTraitRulesElement.find(".//specific[@name='_PARSED_SUB_FEATURES']")
+			if racialTraitSubFeatureElement != None and racialTraitSubFeatureElement != "":
+				racialTraitSubFeatureText = racialTraitSubFeatureElement.text
+				if racialTraitSubFeatureText != None:
+					racialTraitSubFeatureList = racialTraitSubFeatureText.strip().split()
+					for subFeatureID in racialTraitSubFeatureList:
+						subFeatureRulesElement = root.find(".//RulesElement[@internal-id=\""+ subFeatureID.replace(',','') + "\"]")
+						if subFeatureRulesElement != None:
+							racialTrait.fullDescription = racialTrait.fullDescription + subFeatureRulesElement.attrib["name"] + "\\n"	
+							subFeatureShortDescriptionElement = subFeatureRulesElement.find(".//specific[@name='Short Description']")
+							if subFeatureShortDescriptionElement != None:
+								subFeatureShortDescription = subFeatureShortDescriptionElement.text.strip() if subFeatureShortDescriptionElement.text is not None else ""
+								if subFeatureShortDescription != None and subFeatureShortDescription != "":
+									racialTrait.fullDescription = racialTrait.fullDescription + subFeatureShortDescription + "\\n\\n"					
 			
 
 	return character;
@@ -675,6 +741,9 @@ def writeFantasyGroundsFile(character, outputFilename = None, outputType = None)
 
 	#Action Points Used (AP Used)
 	apUsedWrite = ET.SubElement(characterWrite, "apused", type="number").text = "0"
+
+	#Appearance
+	appearanceWrite = ET.SubElement(characterWrite, "appearance", type="string").text = character.appearance
 
 	#Attacks
 	attacksWrite = ET.SubElement(characterWrite, "attacks")
@@ -893,6 +962,9 @@ def writeFantasyGroundsFile(character, outputFilename = None, outputType = None)
 	#Name
 	nameWrite = ET.SubElement(characterWrite, "name", type="string").text = character.characterName
 
+	#Notes
+	notesWrite = ET.SubElement(characterWrite, "notes", type="string").text = character.notes
+
 	#Power Focus
 	powerFocusWrite = ET.SubElement(characterWrite, "powerfocus")
 	implementPowerFocusWrite = ET.SubElement(powerFocusWrite, "implement")
@@ -965,6 +1037,10 @@ def writeFantasyGroundsFile(character, outputFilename = None, outputType = None)
 
 	#Race and Size
 	ET.SubElement(characterWrite, "race", type="string").text = character.race
+	if outputType == "linkedDataOption":
+		raceShortcutWrite = ET.SubElement(characterWrite, "racelink", type="windowreference")
+		ET.SubElement(raceShortcutWrite, "class").text = "powerdesc"
+		ET.SubElement(raceShortcutWrite, "recordname").text = "reference.races." + character.race.replace(" ","").lower() + "@4E PC Options"
 	ET.SubElement(characterWrite, "size", type="string").text = character.size
 
 	#Skills
@@ -994,6 +1070,17 @@ def writeFantasyGroundsFile(character, outputFilename = None, outputType = None)
 	#So far concentrating on features gained at level 1, but later in other class features for essential classes or paragon paths
 	specialAbilityListWrite = ET.SubElement(characterWrite, "specialabilitylist")
 	specialAbilityID = 1
+	##Racial Traits
+	for specialAbility in character.racialTraitList:
+		specialAbilityID += 1
+		specialAbilityIDText = "id-0000" + str(specialAbilityID)
+		specialAbilityIDWrite = ET.SubElement(specialAbilityListWrite, specialAbilityIDText)
+		ET.SubElement(specialAbilityIDWrite, "description", type="string").text = specialAbility.fullDescription
+		specialAbilityShortcutWrite = ET.SubElement(specialAbilityIDWrite, "shortcut", type="windowreference")
+		ET.SubElement(specialAbilityShortcutWrite, "class")
+		ET.SubElement(specialAbilityShortcutWrite, "recordname")
+		ET.SubElement(specialAbilityIDWrite, "value", type="string").text = specialAbility.traitName
+	##Class Features
 	for specialAbility in character.classFeatureList:
 		specialAbilityID += 1
 		specialAbilityIDText = "id-0000" + str(specialAbilityID)
@@ -1003,6 +1090,7 @@ def writeFantasyGroundsFile(character, outputFilename = None, outputType = None)
 		ET.SubElement(specialAbilityShortcutWrite, "class")
 		ET.SubElement(specialAbilityShortcutWrite, "recordname")
 		ET.SubElement(specialAbilityIDWrite, "value", type="string").text = specialAbility.featureName
+
 
 	#Speed
 	speedWrite = ET.SubElement(characterWrite, "speed")
@@ -1031,7 +1119,6 @@ def writeFantasyGroundsFile(character, outputFilename = None, outputType = None)
 	tree = ET.ElementTree(rootWrite)
 	ET.indent(tree, space="\t", level=0)
 	tree.write(outputFilename)
-	print("Character converted succcessfully to ",outputFilename)
 
 # def main() -> int:
 # 	character = readCBLoaderCharacterFile("static/uploads/Ven_Tanymere.dnd4e")

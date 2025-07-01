@@ -526,13 +526,17 @@ def readCBLoaderMainFile(character, mergedFileLocation = None):
 			itemCost = ""
 			itemLevel = ""
 			itemRarity = ""
+			#Item Class
+			itemClass = itemRulesElement.get("type")
+			if itemClass is not None:
+				itemClass = itemClass.strip()			
 			#Fantasy Grounds Item MIType
 			if itemClass == "Weapon":
 				itemFGMIType = "weapon"
 			elif itemClass == "Armor":
 				itemFGMIType = "armor"
 			else:
-				itemFGMIType = "other"			
+				itemFGMIType = "other"
 			#Level
 			itemLevelElement = itemRulesElement.find(".//specific[@name='Level']")
 			if itemLevelElement is not None:
@@ -545,10 +549,6 @@ def readCBLoaderMainFile(character, mergedFileLocation = None):
 			itemSlotElement = itemRulesElement.find(".//specific[@name='Item Slot']")
 			if itemSlotElement is not None:
 				itemSlot = itemSlotElement.text.strip() if itemSlotElement.text is not None else ""
-			#Item Class
-			itemClass = itemRulesElement.get("type")
-			if itemClass is not None:
-				itemClass = itemClass.strip()
 			#Damage
 			itemDamageElement = itemRulesElement.find(".//specific[@name='Damage']")
 			if itemDamageElement is not None:
@@ -586,13 +586,34 @@ def readCBLoaderMainFile(character, mergedFileLocation = None):
 				if itemSubclassElement is not None:
 					itemSubclass = itemSubclassElement.text.strip() if itemSubclassElement.text is not None else ""					
 			elif itemClass == "Magic Item":
-				itemSubclassElement = itemRulesElement.find(".//specific[@name='Item Slot']")
-				if itemSubclassElement is not None:
-					itemSubclass = itemSubclassElement.text.strip() if itemSubclassElement.text is not None else ""				
+				if (itemMagicItemType == "Battle Scars" or 
+					itemMagicItemType == "Divine Boon" or 
+					itemMagicItemType == "Echo of Power" or
+					itemMagicItemType == "Elemental Gift" or
+					itemMagicItemType == "Fey Magic Gift" or
+					itemMagicItemType == "Glory Boon" or
+					itemMagicItemType == "Grandmaster Training" or
+					itemMagicItemType == "Legendary Training" or
+					itemMagicItemType == "Lost Rune" or
+					itemMagicItemType == "Primal Blessing" or
+					itemMagicItemType == "Psionic Talent" or
+					itemMagicItemType == "Secret of the Way" or
+					itemMagicItemType == "Sorcerer-King's Boon" or 
+					itemMagicItemType == "Templar Brand" or
+					itemMagicItemType == "Veiled Alliance Mystery" or
+					itemMagicItemType == "Wanderer's Secret") :
+						itemClass = "Alternative Reward"
+						itemSubclass = itemMagicItemType
+				else :
+					itemItemSlotElement = itemRulesElement.find(".//specific[@name='Item Slot']")
+					if itemItemSlotElement is not None:
+						itemSubclass = itemItemSlotElement.text.strip() if itemItemSlotElement.text is not None else ""
 			elif itemClass == "Weapon":
 				itemSubclassElement = itemRulesElement.find(".//specific[@name='Weapon Category']")
 				if itemSubclassElement is not None:
 					itemSubclass = itemSubclassElement.text.strip() if itemSubclassElement.text is not None else ""
+			else:
+				itemSubclass = itemMagicItemType
 			#Item Range
 			itemRangeElement = itemRulesElement.find(".//specific[@name='Range']")
 			if itemRangeElement is not None:
@@ -1012,6 +1033,8 @@ def writeFantasyGroundsFile(character, outputFilename = None, outputType = None)
 		ET.SubElement(inventoryIDWrite, "showonminisheet", type="number").text = str(inventoryItem.showonminisheet)
 		ET.SubElement(inventoryIDWrite, "weight", type="number").text = str(inventoryItem.weight)
 		ET.SubElement(inventoryIDWrite, "subclass", type="string").text = inventoryItem.subclass
+		if inventoryItem.rarity is not None and inventoryItem.rarity != "":
+			ET.SubElement(inventoryIDWrite, "special", type="string").text = "Rarity: " + inventoryItem.rarity
 
 	#Language List
 	languageListWrite = ET.SubElement(characterWrite, "languagelist")

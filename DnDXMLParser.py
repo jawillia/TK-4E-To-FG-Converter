@@ -1035,6 +1035,13 @@ def writeFantasyGroundsFile(character, outputFilename = None, outputType = None)
 		ET.SubElement(inventoryIDWrite, "subclass", type="string").text = inventoryItem.subclass
 		if inventoryItem.rarity is not None and inventoryItem.rarity != "":
 			ET.SubElement(inventoryIDWrite, "special", type="string").text = "Rarity: " + inventoryItem.rarity
+		if inventoryItem.fgmitype == "weapon":
+			ET.SubElement(inventoryIDWrite, "damage", type="string").text = inventoryItem.itemDamage
+			ET.SubElement(inventoryIDWrite, "profbonus", type="number").text = str(inventoryItem.proficiencyBonus)
+			ET.SubElement(inventoryIDWrite, "properties", type="string").text = inventoryItem.properties
+			ET.SubElement(inventoryIDWrite, "group", type="string").text = inventoryItem.itemGroup
+			if inventoryItem.range is not None:
+				ET.SubElement(inventoryIDWrite, "range", type="number").text = str(inventoryItem.range.split('/')[0])
 
 	#Language List
 	languageListWrite = ET.SubElement(characterWrite, "languagelist")

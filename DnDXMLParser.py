@@ -31,13 +31,14 @@ class Feat():
 		self.fullDescription = ""
 
 class InventoryItem():
-	def __init__(self, itemName, count, carried, showonminisheet, weight):
+	def __init__(self, itemName, count, carried, showonminisheet, weight, subItemName):
 		self.itemName = itemName
 		self.count = count
 		self.carried = carried
 		self.location = ""
 		self.showonminisheet = showonminisheet
 		self.weight = weight
+		self.subItemName = subItemName
 		self.itemClass = ""
 		self.damage = ""
 		self.flavor = ""
@@ -49,6 +50,16 @@ class InventoryItem():
 		self.properties = None
 		self.subclass = None
 		self.range = None
+		self.fgmitype = ""
+		self.cost = ""
+		self.level = 0
+		self.rarity = ""
+		self.magicItemType = ""
+		self.bonus = ""
+		self.enhancement = ""
+		self.critical = ""
+		self.itemProperties = []
+		self.powers = []
 
 class Power():
 	def __init__(self, powerName, action, keywords, prepared, powerRange, recharge, shortdescription, source):
@@ -318,12 +329,18 @@ def readCBLoaderCharacterFile(filename):
 
 	#Inventory List
 	for inventoryElement in lootTallySection:
-		itemName = inventoryElement[0].get("name")
+		mainItemName = ""
+		subItemName = ""
+		if len(inventoryElement) == 1:
+			mainItemName = inventoryElement[0].get("name")
+		else :
+			mainItemName = inventoryElement[1].get("name")
+			subItemName = inventoryElement[0].get("name")
 		count = inventoryElement.get("count")
 		carried = "1" if inventoryElement.get("count") != "0" else "0"
 		showonminisheet = 1
 		weight = 0
-		inventoryitem = InventoryItem(itemName, count, carried, showonminisheet, weight)
+		inventoryitem = InventoryItem(mainItemName, count, carried, showonminisheet, weight, subItemName)
 		character.appendInventory(inventoryitem)
 
 	#Languages
@@ -504,7 +521,12 @@ def readCBLoaderMainFile(character, mergedFileLocation = None):
 	#Inventory List
 	for inventoryElement in character.inventoryList:
 		itemName = inventoryElement.itemName
+		subItemName = inventoryElement.subItemName
+		finalItemName = itemName
+		if subItemName is not None and len(subItemName) > 0:
+			finalItemName = subItemName + " " + itemName
 		itemRulesElement = root.find(".//RulesElement[@name=\""+ itemName +"\"]")
+		subItemRulesElement = root.find(".//RulesElement[@name=\"" + subItemName + "\"]")
 		if itemRulesElement is not None:
 			itemWeight = ""
 			itemSlot = ""
@@ -517,30 +539,58 @@ def readCBLoaderMainFile(character, mergedFileLocation = None):
 			itemProperties = ""
 			itemSubclass = ""
 			itemRange = ""
-			#Weight
-			itemWeightElement = itemRulesElement.find(".//specific[@name='Weight']")
-			if itemWeightElement is not None:
-				itemWeight = itemWeightElement.text.strip() if itemWeightElement.text is not None else "0"
-			#Location
-			itemSlotElement = itemRulesElement.find(".//specific[@name='Item Slot']")
-			if itemSlotElement is not None:
-				itemSlot = itemSlotElement.text.strip() if itemSlotElement.text is not None else ""
+			itemFGMIType = ""
+			itemCost = ""
+			itemLevel = ""
+			itemRarity = ""
+			itemEnhancement = ""
+			itemBonus = ""
+			itemCritical = ""
+			itemProps = []
+			itemPowers = []
 			#Item Class
 			itemClass = itemRulesElement.get("type")
 			if itemClass is not None:
 				itemClass = itemClass.strip()
+			#Level
+			itemLevelElement = itemRulesElement.find(".//specific[@name='Level']")
+			if itemLevelElement is not None:
+				itemLevel = itemLevelElement.text.strip() if itemLevelElement.text is not None else "0"
+			#Weight
+			itemWeightElement = itemRulesElement.find(".//specific[@name='Weight']")
+			if itemWeightElement is not None:
+				itemWeight = itemWeightElement.text.strip() if itemWeightElement.text is not None else "0"
+			elif subItemRulesElement is not None:
+				itemWeightElement = subItemRulesElement.find(".//specific[@name='Weight']")
+				if itemWeightElement is not None:
+					itemWeight = itemWeightElement.text.strip() if itemWeightElement.text is not None else "0"
+			#Location
+			itemSlotElement = itemRulesElement.find(".//specific[@name='Item Slot']")
+			if itemSlotElement is not None:
+				itemSlot = itemSlotElement.text.strip() if itemSlotElement.text is not None else ""
 			#Damage
 			itemDamageElement = itemRulesElement.find(".//specific[@name='Damage']")
 			if itemDamageElement is not None:
 				itemDamage = itemDamageElement.text.strip() if itemDamageElement.text is not None else ""
+			elif subItemRulesElement is not None:
+				itemDamageElement = subItemRulesElement.find(".//specific[@name='Damage']")
+				if itemDamageElement is not None:
+					itemDamage = itemDamageElement.text.strip() if itemDamageElement.text is not None else ""
 			#Flavor
-			itemFlavorElement = itemRulesElement.find(".//specific[@name='Flavor']")
+			itemFlavorElement = itemRulesElement.find(".//Flavor")
 			if itemFlavorElement is not None:
 				itemFlavor = itemFlavorElement.text.strip() if itemFlavorElement.text is not None else ""
+			else:
+				last_child = itemRulesElement[-1]
+				itemFlavor = last_child.tail.strip()
 			#Item Group
 			itemGroupElement = itemRulesElement.find(".//specific[@name='Group']")
 			if itemGroupElement is not None:
 				itemGroup = itemGroupElement.text.strip() if itemGroupElement.text is not None else ""
+			elif subItemRulesElement is not None:
+				itemGroupElement = subItemRulesElement.find(".//specific[@name='Group']")
+				if itemGroupElement is not None:
+					itemGroup = itemGroupElement.text.strip() if itemGroupElement.text is not None else ""
 			#Magic Item Type
 			itemMagicItemTypeElement = itemRulesElement.find(".//specific[@name='Magic Item Type']")
 			if itemMagicItemTypeElement is not None:
@@ -549,32 +599,162 @@ def readCBLoaderMainFile(character, mergedFileLocation = None):
 			itemProfBonusElement = itemRulesElement.find(".//specific[@name='Proficiency Bonus']")
 			if itemProfBonusElement is not None:
 				itemProficiencyBonus = itemProfBonusElement.text.strip() if itemProfBonusElement.text is not None else ""
+			elif subItemRulesElement is not None:
+				itemProfBonusElement = subItemRulesElement.find(".//specific[@name='Proficiency Bonus']")
+				if itemProfBonusElement is not None:
+					itemProficiencyBonus = itemProfBonusElement.text.strip() if itemProfBonusElement.text is not None else ""	
 			#Properties
 			itemPropertiesElement = itemRulesElement.find(".//specific[@name='Properties']")
 			if itemPropertiesElement is not None:
 				itemProperties = itemPropertiesElement.text.strip() if itemPropertiesElement.text is not None else ""
+			elif subItemRulesElement is not None:
+				itemPropertiesElement = subItemRulesElement.find(".//specific[@name='Properties']")
+				if itemPropertiesElement is not None:
+					itemProperties = itemPropertiesElement.text.strip() if itemPropertiesElement.text is not None else ""
 			#Subclass
-			itemSubclassElement = itemRulesElement.find(".//specific[@name='Weapon Category']")
-			if itemSubclassElement is not None:
-				itemSubclass = itemSubclassElement.text.strip() if itemSubclassElement.text is not None else ""
+			if itemClass == "Alternative Reward":
+				itemSubclassElement = itemRulesElement.find(".//specific[@name='Alternative Reward']")
+				if itemSubclassElement is not None:
+					itemSubclass = itemSubclassElement.text.strip() if itemSubclassElement.text is not None else ""
+			elif itemClass == "Gear":
+				itemSubclassElement = itemRulesElement.find(".//specific[@name='Category']")
+				if itemSubclassElement is not None:
+					itemSubclass = itemSubclassElement.text.strip() if itemSubclassElement.text is not None else ""					
+			elif itemClass == "Magic Item":
+				if (itemMagicItemType == "Battle Scars" or 
+					itemMagicItemType == "Divine Boon" or 
+					itemMagicItemType == "Echo of Power" or
+					itemMagicItemType == "Elemental Gift" or
+					itemMagicItemType == "Fey Magic Gift" or
+					itemMagicItemType == "Glory Boon" or
+					itemMagicItemType == "Grandmaster Training" or
+					itemMagicItemType == "Legendary Training" or
+					itemMagicItemType == "Lost Rune" or
+					itemMagicItemType == "Primal Blessing" or
+					itemMagicItemType == "Psionic Talent" or
+					itemMagicItemType == "Secret of the Way" or
+					itemMagicItemType == "Sorcerer-King's Boon" or 
+					itemMagicItemType == "Templar Brand" or
+					itemMagicItemType == "Veiled Alliance Mystery" or
+					itemMagicItemType == "Wanderer's Secret") :
+						itemClass = "Alternative Reward"
+						itemSubclass = itemMagicItemType
+				elif itemMagicItemType == "Weapon":
+					itemClass = "Weapon"
+					itemSubclassElement = itemRulesElement.find(".//specific[@name='Weapon']")
+					if itemSubclassElement is not None:
+						itemSubclass = itemSubclassElement.text.strip() if itemSubclassElement.text is not None else ""
+
+				else :
+					itemItemSlotElement = itemRulesElement.find(".//specific[@name='Item Slot']")
+					if itemItemSlotElement is not None:
+						itemSubclass = itemItemSlotElement.text.strip() if itemItemSlotElement.text is not None else ""
+			elif itemClass == "Weapon":
+				itemSubclassElement = itemRulesElement.find(".//specific[@name='Weapon Category']")
+				if itemSubclassElement is not None:
+					itemSubclass = itemSubclassElement.text.strip() if itemSubclassElement.text is not None else ""
+			else:
+				itemSubclass = itemMagicItemType
 			#Item Range
 			itemRangeElement = itemRulesElement.find(".//specific[@name='Range']")
 			if itemRangeElement is not None:
 				itemRange = itemRangeElement.text.strip() if itemRangeElement.text is not None else ""
+			elif subItemRulesElement is not None:
+				itemRangeElement = subItemRulesElement.find(".//specific[@name='Range']")
+				if itemRangeElement is not None:
+					itemRange = itemRangeElement.text.strip() if itemRangeElement.text is not None else ""				
+			#Item Rarity
+			itemRarityElement = itemRulesElement.find(".//specific[@name='Rarity']")
+			if itemRarityElement is not None:
+				itemRarity = itemRarityElement.text.strip() if itemRarityElement.text is not None else ""
+			#Item Cost
+			goldCost = ""
+			silverCost = ""
+			copperCost = ""
+			itemGoldCostElement = itemRulesElement.find(".//specific[@name='Gold']")
+			if itemGoldCostElement is not None:
+				goldCost = itemGoldCostElement.text.strip() + " gp" if itemGoldCostElement.text is not None else ""
+			itemSilverCostElement = itemRulesElement.find(".//specific[@name='Silver']")
+			if itemSilverCostElement is not None:
+				silverCost = itemSilverCostElement.text.strip + " sp" if itemSilverCostElement.text is not None else ""
+			itemCopperCostElement = itemRulesElement.find(".//specific[@name='Copper']")
+			if itemCopperCostElement is not None:
+				copperCost = itemCopperCostElement.text.strip + " cp" if itemCopperCostElement.text is not None else ""
+			itemCost = goldCost + silverCost + copperCost
+			#Item Enhancement
+			itemEnhancementElement = itemRulesElement.find(".//specific[@name='Enhancement']")
+			if itemEnhancementElement is not None and itemEnhancementElement.text is not None:
+				enhancementText = itemEnhancementElement.text.strip()
+				plusIndex = enhancementText.find("+") + 2
+				if plusIndex != -1:
+					itemBonus = enhancementText[plusIndex-1:plusIndex]
+					itemEnhancement = enhancementText[plusIndex:].strip()
+			#Item Critical
+			itemCriticalElement = itemRulesElement.find(".//specific[@name='Property']")
+			if itemCriticalElement is not None and itemCriticalElement.text is not None:
+				if "critical" in itemCriticalElement.text:
+					itemCritical = itemCriticalElement.text.strip() if itemCriticalElement.text is not None else ""
+			#Magic Item Properties
+			itemPropsElements = itemRulesElement.findall(".//specific[@name='Property']")
+			for itemPropsElement in itemPropsElements:
+				itemPropText = itemPropsElement.text.strip() if itemPropsElement.text is not None else ""
+				itemProps.append(itemPropText)
+			#Powers
+			itemPowersElements = itemRulesElement.findall(".//specific[@name='Power']")
+			for itemPowerElement in itemPowersElements:
+				if itemPowerElement is not None and itemPowerElement.text is not None:
+					powerName = itemPowerElement.text.strip()[:itemPowerElement.text.strip().find("(")]
+					powerAction = ""
+					powerPrepared = "1"
+					powerRange = ""
+					powerRecharge = ""
+					powerShortdescription = ""
+					powerSource = ""
+					powerKeywords = ""
+					parentheticalKeywords = itemPowerElement.text.strip()[itemPowerElement.text.strip().find("(")+1:itemPowerElement.text.strip().find(")")].split("•")
+					for parentheticalKeyword in parentheticalKeywords:
+						if parentheticalKeyword in ["Daily", "At-Will", "Encounter"] :
+							powerRecharge = parentheticalKeyword
+						else:
+							powerKeywords = powerKeywords + parentheticalKeyword + ","
+					powerKeywords = powerKeywords[:-1]
+					powerAction = itemPowerElement.text.strip()[itemPowerElement.text.find(":")+1:itemPowerElement.text.strip().find(".")].strip()
+					powerShortdescription = itemPowerElement.text[itemPowerElement.text.find(powerAction + ".")+len(powerAction)+1:].strip()
+					#powerName, action, keywords, prepared, powerRange, recharge, shortdescription, source
+					itemPower = Power(powerName, powerAction, powerKeywords, powerPrepared, powerRange, powerRecharge, powerShortdescription, powerSource)
+					itemPowers.append(itemPower)
+			#Fantasy Grounds Item MIType
+			if itemClass == "Weapon":
+				itemFGMIType = "weapon"
+			elif itemClass == "Armor":
+				itemFGMIType = "armor"
+			else:
+				itemFGMIType = "other"
 			#Finish Adding Stats to the Items
 			for inventoryItem in character.inventoryList:
 				if inventoryItem.itemName == itemName:
+					inventoryItem.itemName = finalItemName
 					inventoryItem.weight = itemWeight
 					inventoryItem.location = itemSlot
-					inventoryItem.itemClass = itemClass 
+					inventoryItem.itemClass = itemClass
+					inventoryItem.magicItemType = itemMagicItemType
 					inventoryItem.itemDamage = itemDamage
-					inventoryItem.itemFlavor = itemFlavor
+					inventoryItem.flavor = itemFlavor
 					inventoryItem.itemGroup = itemGroup
 					inventoryItem.mitype = itemMagicItemType
 					inventoryItem.proficiencyBonus = itemProficiencyBonus
 					inventoryItem.properties = itemProperties
 					inventoryItem.subclass = itemSubclass
 					inventoryItem.range = itemRange
+					inventoryItem.fgmitype = itemFGMIType
+					inventoryItem.cost = itemCost
+					inventoryItem.level = itemLevel
+					inventoryItem.rarity = itemRarity
+					inventoryItem.bonus = itemBonus
+					inventoryItem.enhancement = itemEnhancement
+					inventoryItem.critical = itemCritical
+					inventoryItem.itemProps = itemProps
+					inventoryItem.powers = itemPowers
 
 	#Powers
 	for power in character.powerList:
@@ -935,15 +1115,53 @@ def writeFantasyGroundsFile(character, outputFilename = None, outputType = None)
 	#Inventory List
 	inventoryListWrite = ET.SubElement(characterWrite, "inventorylist")
 	inventoryID = 0
-	for inventoryElement in character.inventoryList:
+	for inventoryItem in character.inventoryList:
 		inventoryID += 1
 		inventoryIDText = "id-0000" + str(inventoryID)
 		inventoryIDWrite = ET.SubElement(inventoryListWrite, inventoryIDText)
-		ET.SubElement(inventoryIDWrite, "carried", type="number").text = inventoryElement.carried
-		ET.SubElement(inventoryIDWrite, "count", type="number").text = inventoryElement.count
-		ET.SubElement(inventoryIDWrite, "name", type="string").text = inventoryElement.itemName
-		ET.SubElement(inventoryIDWrite, "showonminisheet", type="number").text = str(inventoryElement.showonminisheet)
-		ET.SubElement(inventoryIDWrite, "weight", type="number").text = str(inventoryElement.weight)
+		ET.SubElement(inventoryIDWrite, "carried", type="number").text = inventoryItem.carried
+		if inventoryItem.itemClass == "Magic Item" and (inventoryItem.magicItemType == "Consumable" or inventoryItem.magicItemType == "Alchemical Item"):
+			ET.SubElement(inventoryIDWrite, "class", type="string").text = inventoryItem.magicItemType
+		else:
+			ET.SubElement(inventoryIDWrite, "class", type="string").text = inventoryItem.itemClass
+		ET.SubElement(inventoryIDWrite, "count", type="number").text = inventoryItem.count
+		ET.SubElement(inventoryIDWrite, "cost", type="string").text = inventoryItem.cost
+		ET.SubElement(inventoryIDWrite, "flavor", type="string").text = inventoryItem.flavor
+		ET.SubElement(inventoryIDWrite, "level", type="number").text = str(inventoryItem.level)
+		ET.SubElement(inventoryIDWrite, "mitype", type="string").text = inventoryItem.fgmitype
+		ET.SubElement(inventoryIDWrite, "name", type="string").text = inventoryItem.itemName
+		ET.SubElement(inventoryIDWrite, "showonminisheet", type="number").text = str(inventoryItem.showonminisheet)
+		ET.SubElement(inventoryIDWrite, "weight", type="number").text = str(inventoryItem.weight)
+		ET.SubElement(inventoryIDWrite, "subclass", type="string").text = inventoryItem.subclass
+		if inventoryItem.rarity is not None and inventoryItem.rarity != "":
+			ET.SubElement(inventoryIDWrite, "special", type="string").text = "Rarity: " + inventoryItem.rarity
+		if inventoryItem.fgmitype == "weapon":
+			ET.SubElement(inventoryIDWrite, "damage", type="string").text = inventoryItem.itemDamage
+			ET.SubElement(inventoryIDWrite, "profbonus", type="number").text = str(inventoryItem.proficiencyBonus)
+			ET.SubElement(inventoryIDWrite, "properties", type="string").text = inventoryItem.properties
+			ET.SubElement(inventoryIDWrite, "group", type="string").text = inventoryItem.itemGroup
+			if inventoryItem.range is not None:
+				ET.SubElement(inventoryIDWrite, "range", type="number").text = str(inventoryItem.range.split('/')[0])
+			ET.SubElement(inventoryIDWrite, "bonus", type="number").text = str(inventoryItem.bonus)
+			ET.SubElement(inventoryIDWrite, "enhancement", type="string").text = inventoryItem.enhancement
+			ET.SubElement(inventoryIDWrite, "critical", type="string").text = inventoryItem.critical
+		itemPropListWrite = ET.SubElement(inventoryIDWrite, "props")
+		itemPropID = 0
+		for itemProp in inventoryItem.itemProps:
+			itemPropID += 1
+			itemPropIDText = "id-0000" + str(itemPropID)
+			itemPropIDWrite = ET.SubElement(itemPropListWrite, itemPropIDText)
+			ET.SubElement(itemPropIDWrite, "shortdescription", type="string").text = itemProp
+		itemPowerListWrite = ET.SubElement(inventoryIDWrite, "powers")
+		itemPowerID = 0
+		for itemPower in inventoryItem.powers:
+			itemPowerID += 1
+			itemPowerIDText = "id-0000" + str(itemPowerID)
+			itemPowerIDWrite = ET.SubElement(itemPowerListWrite, itemPowerIDText)
+			ET.SubElement(itemPowerIDWrite, "action", type="string").text = itemPower.action
+			ET.SubElement(itemPowerIDWrite, "name", type="string").text = itemPower.powerName
+			ET.SubElement(itemPowerIDWrite, "recharge", type="string").text = itemPower.recharge
+			ET.SubElement(itemPowerIDWrite, "shortdescription", type="string").text = itemPower.shortdescription
 
 	#Language List
 	languageListWrite = ET.SubElement(characterWrite, "languagelist")

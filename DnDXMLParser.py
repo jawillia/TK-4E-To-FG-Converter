@@ -58,6 +58,10 @@ class InventoryItem():
 		self.bonus = ""
 		self.enhancement = ""
 		self.critical = ""
+		self.armorBonus = ""
+		self.checkPenalty = ""
+		self.speed = ""
+		self.recordname = ""
 		self.itemProperties = []
 		self.powers = []
 
@@ -140,6 +144,8 @@ class Character():
 		self.size = ""
 		self.baseSpeed = 0
 		self.totalSpeed = 0
+		self.meleeAttackMiscBonus = 0;
+		self.rangeAttackMiscBonus = 0;
 		self.featsListRulesElements = []
 		self.languageRulesElements = []
 		self.armorProficiencyElements = []
@@ -338,26 +344,43 @@ def readCBLoaderCharacterFile(filename):
 			subItemName = inventoryElement[0].get("name")
 		count = inventoryElement.get("count")
 		carried = "1" if inventoryElement.get("count") != "0" else "0"
+		carried = "2" if inventoryElement.get("equip-count") != "0" else carried
 		showonminisheet = 1
 		weight = 0
-		inventoryitem = InventoryItem(mainItemName, count, carried, showonminisheet, weight, subItemName)
-		character.appendInventory(inventoryitem)
+		if carried != 0:
+			inventoryitem = InventoryItem(mainItemName, count, carried, showonminisheet, weight, subItemName)
+			character.appendInventory(inventoryitem)
 
 	#Languages
 	character.languageRulesElements = rulesElementTallySection.findall(".//RulesElement[@type='Language']")
 
-	#Powers
+	#Attacks and #Powers
 	for powerElement in powersStatsSection.findall("Power"):
 		powerName = powerElement.get("name")
-		powerActionTypeElement = powerElement.find(".//specific[@name='Action Type']")
-		if powerActionTypeElement is not None:
-			powerAction = powerActionTypeElement.text.strip()
-		powerPrepared = "1"
-		powerUsageElement = powerElement.find(".//specific[@name='Power Usage']")
-		if powerUsageElement is not None:
-			powerRecharge = powerUsageElement.text.strip()
-		power = Power(powerName, powerAction, "", powerPrepared, "", powerRecharge, "", "")
-		character.appendPower(power)
+		if powerName == "Melee Basic Attack" or powerName == "Ranged Basic Attack":
+			attackWeaponElement = powerElement.find(".//Weapon")
+			if attackWeaponElement is not None:
+				attackWeaponHitComponentsElement = attackWeaponElement.find("HitComponents")
+				if attackWeaponHitComponentsElement is not None:
+					attackWeaponHitComponentsLines = attackWeaponHitComponentsElement.text.splitlines();
+					for line in attackWeaponHitComponentsLines:
+						if "inherent bonus" in line.lower() and "[Doesn't Stack]" not in line:
+							attackLineEnhancementBonus = regularExpression.search(r'\+(\d+)\s', line)
+							if attackLineEnhancementBonus:
+								if powerName == "Melee Basic Attack":
+									character.meleeAttackMiscBonus = int(attackLineEnhancementBonus.group(1))
+								elif powerName == "Ranged Basic Attack":
+									character.rangeAttackMiscBonus = int(attackLineEnhancementBonus.group(1))
+		else:
+			powerActionTypeElement = powerElement.find(".//specific[@name='Action Type']")
+			if powerActionTypeElement is not None:
+				powerAction = powerActionTypeElement.text.strip()
+			powerPrepared = "1"
+			powerUsageElement = powerElement.find(".//specific[@name='Power Usage']")
+			if powerUsageElement is not None:
+				powerRecharge = powerUsageElement.text.strip()
+			power = Power(powerName, powerAction, "", powerPrepared, "", powerRecharge, "", "")
+			character.appendPower(power)
 
 	#Armor Proficiencies
 	character.armorProficiencyElements = []
@@ -546,6 +569,9 @@ def readCBLoaderMainFile(character, mergedFileLocation = None):
 			itemEnhancement = ""
 			itemBonus = ""
 			itemCritical = ""
+			itemArmorBonus = ""
+			itemCheckPenalty = ""
+			itemSpeed = ""
 			itemProps = []
 			itemPowers = []
 			#Item Class
@@ -616,6 +642,10 @@ def readCBLoaderMainFile(character, mergedFileLocation = None):
 				itemSubclassElement = itemRulesElement.find(".//specific[@name='Alternative Reward']")
 				if itemSubclassElement is not None:
 					itemSubclass = itemSubclassElement.text.strip() if itemSubclassElement.text is not None else ""
+			elif itemClass == "Armor":
+				itemSubclassElement = itemRulesElement.find(".//specific[@name='Armor Type']")
+				if itemSubclassElement is not None:
+					itemSubclass = itemSubclassElement.text.strip() if itemSubclassElement.text is not None else ""			
 			elif itemClass == "Gear":
 				itemSubclassElement = itemRulesElement.find(".//specific[@name='Category']")
 				if itemSubclassElement is not None:
@@ -694,6 +724,18 @@ def readCBLoaderMainFile(character, mergedFileLocation = None):
 			if itemCriticalElement is not None and itemCriticalElement.text is not None:
 				if "critical" in itemCriticalElement.text:
 					itemCritical = itemCriticalElement.text.strip() if itemCriticalElement.text is not None else ""
+			#Item Armor Bonus
+			itemArmorBonusElement = itemRulesElement.find(".//specific[@name='Armor Bonus']")
+			if itemArmorBonusElement is not None and itemArmorBonusElement.text is not None:
+				itemArmorBonus = itemArmorBonusElement.text.strip() if itemArmorBonusElement.text is not None else ""
+			#Item Check Penalty
+			itemCheckPenaltyElement = itemRulesElement.find(".//specific[@name='Check']")
+			if itemCheckPenaltyElement is not None and itemArmorBonusElement.text is not None:
+				itemCheckPenalty = itemCheckPenaltyElement.text.strip() if itemCheckPenaltyElement.text is not None else ""
+			#Item Speed Penalty
+			itemSpeedElement = itemRulesElement.find(".//specific[@name='Speed']")
+			if itemSpeedElement is not None and itemArmorBonusElement.text is not None:
+				itemSpeed = itemSpeedElement.text.strip() if itemSpeedElement.text is not None else ""			
 			#Magic Item Properties
 			itemPropsElements = itemRulesElement.findall(".//specific[@name='Property']")
 			for itemPropsElement in itemPropsElements:
@@ -753,6 +795,9 @@ def readCBLoaderMainFile(character, mergedFileLocation = None):
 					inventoryItem.bonus = itemBonus
 					inventoryItem.enhancement = itemEnhancement
 					inventoryItem.critical = itemCritical
+					inventoryItem.armorBonus = itemArmorBonus
+					inventoryItem.checkPenalty = itemCheckPenalty
+					inventoryItem.speed = itemSpeed
 					inventoryItem.itemProps = itemProps
 					inventoryItem.powers = itemPowers
 
@@ -761,48 +806,49 @@ def readCBLoaderMainFile(character, mergedFileLocation = None):
 		powerRulesElementList = root.findall(".//RulesElement[@name=\""+ power.powerName +"\"][@type='Power']")
 		#Get the last item of the list since it seems to generally be the most recent one.
 		#TODO:Should probably compare revision dates to make it correct, though
-		powerRulesElement = powerRulesElementList[-1]
-		powerKeywords = ""
-		powerRange = ""
-		powerDescription = ""
-		powerSource = ""
-		#Keywords
-		keywordsRuleElement = powerRulesElement.find(".//specific[@name='Keywords']")
-		if keywordsRuleElement is not None:
-			powerKeywords = keywordsRuleElement.text.strip() if keywordsRuleElement.text is not None else ""
-		#Range
-		rangeRuleElement = powerRulesElement.find(".//specific[@name='Attack Type']")
-		if rangeRuleElement is not None:
-			powerRange = rangeRuleElement.text.strip() if rangeRuleElement.text is not None else ""
-		#Short Description
-		shortDescriptionRuleElements = powerRulesElement.findall(".//")
-		for element in shortDescriptionRuleElements:
-			if (("name" not in element.attrib and "Category" not in element.tag) or 
-				("name" in element.attrib and element.attrib["name"] != "Power Usage" 
-					and element.attrib["name"] != "Display" 
-					and element.attrib["name"] != "Keywords"
-					and element.attrib["name"] != "Action Type"
-					and element.attrib["name"] != "Attack Type"
-					and element.attrib["name"] != "Class"
-					and element.attrib["name"] != "Level"
-					and element.attrib["name"] != "Power Type"
-					and element.attrib["name"] != "Powers"
-					and "_" not in element.attrib["name"])):
-				if "name" in element.attrib and powerDescription is not None and element.text is not None:
-					powerDescription = powerDescription + str(element.attrib["name"]) + ": " + element.text + "\\n"
-				elif powerDescription is not None and element.text is not None:
-					powerDescription = powerDescription + element.text + "\\n\\n"
-		#Source
-		sourceRuleElement = powerRulesElement.find(".//specific[@name='Display']")
-		if sourceRuleElement is not None:
-			powerSource = sourceRuleElement.text.strip() if sourceRuleElement.text is not None else ""			
-		#Finish Adding Stats to the Powers
-		for characterPower in character.powerList:
-			if characterPower.powerName == power.powerName:
-				characterPower.keywords = powerKeywords
-				characterPower.powerRange = powerRange
-				characterPower.shortdescription = powerDescription
-				characterPower.source = powerSource
+		if powerRulesElementList:
+			powerRulesElement = powerRulesElementList[-1]
+			powerKeywords = ""
+			powerRange = ""
+			powerDescription = ""
+			powerSource = ""
+			#Keywords
+			keywordsRuleElement = powerRulesElement.find(".//specific[@name='Keywords']")
+			if keywordsRuleElement is not None:
+				powerKeywords = keywordsRuleElement.text.strip() if keywordsRuleElement.text is not None else ""
+			#Range
+			rangeRuleElement = powerRulesElement.find(".//specific[@name='Attack Type']")
+			if rangeRuleElement is not None:
+				powerRange = rangeRuleElement.text.strip() if rangeRuleElement.text is not None else ""
+			#Short Description
+			shortDescriptionRuleElements = powerRulesElement.findall(".//")
+			for element in shortDescriptionRuleElements:
+				if (("name" not in element.attrib and "Category" not in element.tag) or 
+					("name" in element.attrib and element.attrib["name"] != "Power Usage" 
+						and element.attrib["name"] != "Display" 
+						and element.attrib["name"] != "Keywords"
+						and element.attrib["name"] != "Action Type"
+						and element.attrib["name"] != "Attack Type"
+						and element.attrib["name"] != "Class"
+						and element.attrib["name"] != "Level"
+						and element.attrib["name"] != "Power Type"
+						and element.attrib["name"] != "Powers"
+						and "_" not in element.attrib["name"])):
+					if "name" in element.attrib and powerDescription is not None and element.text is not None:
+						powerDescription = powerDescription + str(element.attrib["name"]) + ": " + element.text + "\\n"
+					elif powerDescription is not None and element.text is not None:
+						powerDescription = powerDescription + element.text + "\\n\\n"
+			#Source
+			sourceRuleElement = powerRulesElement.find(".//specific[@name='Display']")
+			if sourceRuleElement is not None:
+				powerSource = sourceRuleElement.text.strip() if sourceRuleElement.text is not None else ""			
+			#Finish Adding Stats to the Powers
+			for characterPower in character.powerList:
+				if characterPower.powerName == power.powerName:
+					characterPower.keywords = powerKeywords
+					characterPower.powerRange = powerRange
+					characterPower.shortdescription = powerDescription
+					characterPower.source = powerSource
 
 	#Special Ability
 	#Class Features
@@ -874,6 +920,11 @@ def writeFantasyGroundsFile(character, outputFilename = None, outputType = None)
 	rootWrite.set('release', '28|CoreRPG:6')
 	characterWrite = ET.SubElement(rootWrite, "character")
 
+	#May determine other things so putting this up top
+	#Level and Level Bonus (1/2 level)
+	ET.SubElement(characterWrite, "level", type="number").text = character.level
+	ET.SubElement(characterWrite, "levelbonus", type="number").text = str(character.levelBonus)
+
 	#Writing Ability Scores
 	abilitiesWrite = ET.SubElement(characterWrite, "abilities")
 	#Charisma
@@ -929,14 +980,14 @@ def writeFantasyGroundsFile(character, outputFilename = None, outputType = None)
 	attacksWrite = ET.SubElement(characterWrite, "attacks")
 	meleeAttacksWrite = ET.SubElement(attacksWrite, "melee")
 	ET.SubElement(meleeAttacksWrite, "ability", type="number").text = str(character.strengthModifier)
-	ET.SubElement(meleeAttacksWrite, "misc", type="number").text = "0"
+	ET.SubElement(meleeAttacksWrite, "misc", type="number").text = str(character.meleeAttackMiscBonus)
 	ET.SubElement(meleeAttacksWrite, "temporary", type="number").text = "0"
-	ET.SubElement(meleeAttacksWrite, "total", type="number").text = str(character.strengthModifier)
+	ET.SubElement(meleeAttacksWrite, "total", type="number").text = str(character.strengthModifier + character.meleeAttackMiscBonus)
 	rangedAttacksWrite = ET.SubElement(attacksWrite, "ranged")
 	ET.SubElement(rangedAttacksWrite, "ability", type="number").text = str(character.dexterityModifier)
-	ET.SubElement(rangedAttacksWrite, "misc", type="number").text = "0"
+	ET.SubElement(rangedAttacksWrite, "misc", type="number").text = str(character.rangeAttackMiscBonus)
 	ET.SubElement(rangedAttacksWrite, "temporary", type="number").text = "0"
-	ET.SubElement(rangedAttacksWrite, "total", type="number").text = str(character.dexterityModifier)
+	ET.SubElement(rangedAttacksWrite, "total", type="number").text = str(character.dexterityModifier + character.rangeAttackMiscBonus)
 
 	#Charisma Check Modifier
 	charismacheckmodifierWrite = ET.SubElement(characterWrite, "charismacheckmodifier", type="number").text = "0"
@@ -998,7 +1049,7 @@ def writeFantasyGroundsFile(character, outputFilename = None, outputType = None)
 	ET.SubElement(defensesACWrite, "ability", type="number").text = str(armorclassAbilityBonus)
 	ET.SubElement(defensesACWrite, "armor", type="number").text = character.armor
 	ET.SubElement(defensesACWrite, "base", type="number").text = "10"
-	ET.SubElement(defensesACWrite, "misc", type="number").text = str(int(character.defenseAC) - (10 + armorclassAbilityBonus + int(character.armor)))
+	ET.SubElement(defensesACWrite, "misc", type="number").text = str(int(character.defenseAC) - (10 + armorclassAbilityBonus + int(character.armor)) - character.levelBonus)
 	ET.SubElement(defensesACWrite, "temporary", type="number").text = "0"
 	ET.SubElement(defensesACWrite, "total", type="number").text = character.defenseAC
 	#Fortitude
@@ -1010,7 +1061,7 @@ def writeFantasyGroundsFile(character, outputFilename = None, outputType = None)
 		fortitudeAbilityBonus = character.constitutionModifier
 	ET.SubElement(defensesFortWrite, "ability", type="number").text = str(fortitudeAbilityBonus)
 	ET.SubElement(defensesFortWrite, "base", type="number").text = "10"
-	ET.SubElement(defensesFortWrite, "misc", type="number").text = str(int(character.defenseFortitude) - (10 + fortitudeAbilityBonus))
+	ET.SubElement(defensesFortWrite, "misc", type="number").text = str(int(character.defenseFortitude) - (10 + fortitudeAbilityBonus) - character.levelBonus)
 	ET.SubElement(defensesFortWrite, "temporary", type="number").text = "0"
 	ET.SubElement(defensesFortWrite, "total", type="number").text = character.defenseFortitude
 	#Reflex
@@ -1023,7 +1074,7 @@ def writeFantasyGroundsFile(character, outputFilename = None, outputType = None)
 	ET.SubElement(defensesReflexWrite, "ability", type="number").text = str(reflexAbilityBonus)
 	ET.SubElement(defensesReflexWrite, "armor", type="number").text = "0"
 	ET.SubElement(defensesReflexWrite, "base", type="number").text = "10"
-	ET.SubElement(defensesReflexWrite, "misc", type="number").text = str(int(character.defenseReflex) - (10 + reflexAbilityBonus))
+	ET.SubElement(defensesReflexWrite, "misc", type="number").text = str(int(character.defenseReflex) - (10 + reflexAbilityBonus) - character.levelBonus)
 	ET.SubElement(defensesReflexWrite, "temporary", type="number").text = "0"
 	ET.SubElement(defensesReflexWrite, "total", type="number").text = character.defenseReflex
 	#Save
@@ -1041,7 +1092,7 @@ def writeFantasyGroundsFile(character, outputFilename = None, outputType = None)
 		willAbilityBonus = character.charismaModifier
 	ET.SubElement(defensesWillWrite, "ability", type="number").text = str(willAbilityBonus)
 	ET.SubElement(defensesWillWrite, "base", type="number").text = "10"
-	ET.SubElement(defensesWillWrite, "misc", type="number").text = str(int(character.defenseWill) - (10 + willAbilityBonus))
+	ET.SubElement(defensesWillWrite, "misc", type="number").text = str(int(character.defenseWill) - (10 + willAbilityBonus) - character.levelBonus)
 	ET.SubElement(defensesWillWrite, "temporary", type="number").text = "0"
 	ET.SubElement(defensesWillWrite, "total", type="number").text = character.defenseWill
 
@@ -1059,6 +1110,15 @@ def writeFantasyGroundsFile(character, outputFilename = None, outputType = None)
 	ET.SubElement(encumberanceWrite, "heavyload", type="number").text = str(int(character.strength)*20)
 	ET.SubElement(encumberanceWrite, "load", type="number").text = character.currentCarriedWeight
 	ET.SubElement(encumberanceWrite, "normalload", type="number").text = str(int(character.strength)*10)
+	overCarryMaxEncumberanceWrite = ET.SubElement(characterWrite, "encumbrance")
+	ET.SubElement(overCarryMaxEncumberanceWrite, "armorcheckpenalty", type="number").text = character.armorCheckPenalty
+	ET.SubElement(overCarryMaxEncumberanceWrite, "dragload", type="number").text = str(int(character.strength)*50)
+	ET.SubElement(overCarryMaxEncumberanceWrite, "heavyarmor", type="number").text = "1" if character.isHeavyArmorEquipped == True else "0"
+	ET.SubElement(overCarryMaxEncumberanceWrite, "heavyload", type="number").text = str(int(character.strength)*20)
+	ET.SubElement(overCarryMaxEncumberanceWrite, "level", type="number").text = str(character.levelBonus)
+	ET.SubElement(overCarryMaxEncumberanceWrite, "load", type="number").text = character.currentCarriedWeight
+	ET.SubElement(overCarryMaxEncumberanceWrite, "normalload", type="number").text = str(int(character.strength)*10)
+	ET.SubElement(overCarryMaxEncumberanceWrite, "state", type="string").text = "Over Carry Max."
 
 	#Experience
 	experienceWrite = ET.SubElement(characterWrite, "exp", type="number").text = character.experience if character.experience != "" else "0" 
@@ -1113,55 +1173,76 @@ def writeFantasyGroundsFile(character, outputFilename = None, outputType = None)
 	intelligencecheckmodifierWrite = ET.SubElement(characterWrite, "intelligencecheckmodifier", type="number").text = "0"
 
 	#Inventory List
+	weaponList = []
 	inventoryListWrite = ET.SubElement(characterWrite, "inventorylist")
 	inventoryID = 0
 	for inventoryItem in character.inventoryList:
-		inventoryID += 1
-		inventoryIDText = "id-0000" + str(inventoryID)
-		inventoryIDWrite = ET.SubElement(inventoryListWrite, inventoryIDText)
-		ET.SubElement(inventoryIDWrite, "carried", type="number").text = inventoryItem.carried
-		if inventoryItem.itemClass == "Magic Item" and (inventoryItem.magicItemType == "Consumable" or inventoryItem.magicItemType == "Alchemical Item"):
-			ET.SubElement(inventoryIDWrite, "class", type="string").text = inventoryItem.magicItemType
-		else:
-			ET.SubElement(inventoryIDWrite, "class", type="string").text = inventoryItem.itemClass
-		ET.SubElement(inventoryIDWrite, "count", type="number").text = inventoryItem.count
-		ET.SubElement(inventoryIDWrite, "cost", type="string").text = inventoryItem.cost
-		ET.SubElement(inventoryIDWrite, "flavor", type="string").text = inventoryItem.flavor
-		ET.SubElement(inventoryIDWrite, "level", type="number").text = str(inventoryItem.level)
-		ET.SubElement(inventoryIDWrite, "mitype", type="string").text = inventoryItem.fgmitype
-		ET.SubElement(inventoryIDWrite, "name", type="string").text = inventoryItem.itemName
-		ET.SubElement(inventoryIDWrite, "showonminisheet", type="number").text = str(inventoryItem.showonminisheet)
-		ET.SubElement(inventoryIDWrite, "weight", type="number").text = str(inventoryItem.weight)
-		ET.SubElement(inventoryIDWrite, "subclass", type="string").text = inventoryItem.subclass
-		if inventoryItem.rarity is not None and inventoryItem.rarity != "":
-			ET.SubElement(inventoryIDWrite, "special", type="string").text = "Rarity: " + inventoryItem.rarity
-		if inventoryItem.fgmitype == "weapon":
-			ET.SubElement(inventoryIDWrite, "damage", type="string").text = inventoryItem.itemDamage
-			ET.SubElement(inventoryIDWrite, "profbonus", type="number").text = str(inventoryItem.proficiencyBonus)
-			ET.SubElement(inventoryIDWrite, "properties", type="string").text = inventoryItem.properties
-			ET.SubElement(inventoryIDWrite, "group", type="string").text = inventoryItem.itemGroup
-			if inventoryItem.range is not None:
-				ET.SubElement(inventoryIDWrite, "range", type="number").text = str(inventoryItem.range.split('/')[0])
-			ET.SubElement(inventoryIDWrite, "bonus", type="number").text = str(inventoryItem.bonus)
-			ET.SubElement(inventoryIDWrite, "enhancement", type="string").text = inventoryItem.enhancement
-			ET.SubElement(inventoryIDWrite, "critical", type="string").text = inventoryItem.critical
-		itemPropListWrite = ET.SubElement(inventoryIDWrite, "props")
-		itemPropID = 0
-		for itemProp in inventoryItem.itemProps:
-			itemPropID += 1
-			itemPropIDText = "id-0000" + str(itemPropID)
-			itemPropIDWrite = ET.SubElement(itemPropListWrite, itemPropIDText)
-			ET.SubElement(itemPropIDWrite, "shortdescription", type="string").text = itemProp
-		itemPowerListWrite = ET.SubElement(inventoryIDWrite, "powers")
-		itemPowerID = 0
-		for itemPower in inventoryItem.powers:
-			itemPowerID += 1
-			itemPowerIDText = "id-0000" + str(itemPowerID)
-			itemPowerIDWrite = ET.SubElement(itemPowerListWrite, itemPowerIDText)
-			ET.SubElement(itemPowerIDWrite, "action", type="string").text = itemPower.action
-			ET.SubElement(itemPowerIDWrite, "name", type="string").text = itemPower.powerName
-			ET.SubElement(itemPowerIDWrite, "recharge", type="string").text = itemPower.recharge
-			ET.SubElement(itemPowerIDWrite, "shortdescription", type="string").text = itemPower.shortdescription
+		if inventoryItem.carried != "0":
+			inventoryID += 1
+			inventoryIDText = "id-0000" + str(inventoryID)
+			inventoryIDWrite = ET.SubElement(inventoryListWrite, inventoryIDText)
+			ET.SubElement(inventoryIDWrite, "carried", type="number").text = inventoryItem.carried
+			if inventoryItem.itemClass == "Magic Item" and (inventoryItem.magicItemType == "Consumable" or inventoryItem.magicItemType == "Alchemical Item"):
+				ET.SubElement(inventoryIDWrite, "class", type="string").text = inventoryItem.magicItemType
+			else:
+				ET.SubElement(inventoryIDWrite, "class", type="string").text = inventoryItem.itemClass
+			ET.SubElement(inventoryIDWrite, "count", type="number").text = inventoryItem.count
+			ET.SubElement(inventoryIDWrite, "cost", type="string").text = inventoryItem.cost
+			ET.SubElement(inventoryIDWrite, "flavor", type="string").text = inventoryItem.flavor
+			ET.SubElement(inventoryIDWrite, "level", type="number").text = str(inventoryItem.level)
+			ET.SubElement(inventoryIDWrite, "mitype", type="string").text = inventoryItem.fgmitype
+			ET.SubElement(inventoryIDWrite, "name", type="string").text = inventoryItem.itemName
+			ET.SubElement(inventoryIDWrite, "showonminisheet", type="number").text = str(inventoryItem.showonminisheet)
+			ET.SubElement(inventoryIDWrite, "weight", type="number").text = str(inventoryItem.weight)
+			ET.SubElement(inventoryIDWrite, "subclass", type="string").text = inventoryItem.subclass
+			if inventoryItem.rarity is not None and inventoryItem.rarity != "":
+				ET.SubElement(inventoryIDWrite, "special", type="string").text = "Rarity: " + inventoryItem.rarity
+			if inventoryItem.fgmitype == "weapon":
+				ET.SubElement(inventoryIDWrite, "damage", type="string").text = inventoryItem.itemDamage
+				ET.SubElement(inventoryIDWrite, "profbonus", type="number").text = str(inventoryItem.proficiencyBonus)
+				ET.SubElement(inventoryIDWrite, "properties", type="string").text = inventoryItem.properties
+				ET.SubElement(inventoryIDWrite, "group", type="string").text = inventoryItem.itemGroup
+				if inventoryItem.range is not None:
+					ET.SubElement(inventoryIDWrite, "range", type="number").text = str(inventoryItem.range.split('/')[0])
+				ET.SubElement(inventoryIDWrite, "bonus", type="number").text = str(inventoryItem.bonus)
+				ET.SubElement(inventoryIDWrite, "enhancement", type="string").text = inventoryItem.enhancement
+				ET.SubElement(inventoryIDWrite, "critical", type="string").text = inventoryItem.critical
+				weaponItem = InventoryItem(inventoryItem.itemName, inventoryItem.count, inventoryItem.carried, inventoryItem.showonminisheet, inventoryItem.weight, inventoryItem.subItemName)
+				if inventoryItem.proficiencyBonus:
+					weaponItem.proficiencyBonus = inventoryItem.proficiencyBonus
+				else:
+					weaponItem.proficiencyBonus = 0
+				if inventoryItem.bonus:
+					weaponItem.bonus = inventoryItem.bonus
+				else:
+					weaponItem.bonus = 0
+				#TODO:Add all the critical fields
+				weaponItem.critical = inventoryItem.critical
+				weaponItem.itemDamage = inventoryItem.itemDamage
+				weaponItem.range = inventoryItem.range.split('/')[0]
+				weaponItem.recordname = inventoryIDText
+				weaponList.append(weaponItem)
+			if inventoryItem.fgmitype == "armor":
+				ET.SubElement(inventoryIDWrite, "ac", type="number").text = str(inventoryItem.armorBonus)
+				ET.SubElement(inventoryIDWrite, "checkpenalty", type="number").text = str(inventoryItem.checkPenalty)
+				ET.SubElement(inventoryIDWrite, "speed", type="number").text = str(inventoryItem.speed)
+			itemPropListWrite = ET.SubElement(inventoryIDWrite, "props")
+			itemPropID = 0
+			for itemProp in inventoryItem.itemProps:
+				itemPropID += 1
+				itemPropIDText = "id-0000" + str(itemPropID)
+				itemPropIDWrite = ET.SubElement(itemPropListWrite, itemPropIDText)
+				ET.SubElement(itemPropIDWrite, "shortdescription", type="string").text = itemProp
+			itemPowerListWrite = ET.SubElement(inventoryIDWrite, "powers")
+			itemPowerID = 0
+			for itemPower in inventoryItem.powers:
+				itemPowerID += 1
+				itemPowerIDText = "id-0000" + str(itemPowerID)
+				itemPowerIDWrite = ET.SubElement(itemPowerListWrite, itemPowerIDText)
+				ET.SubElement(itemPowerIDWrite, "action", type="string").text = itemPower.action
+				ET.SubElement(itemPowerIDWrite, "name", type="string").text = itemPower.powerName
+				ET.SubElement(itemPowerIDWrite, "recharge", type="string").text = itemPower.recharge
+				ET.SubElement(itemPowerIDWrite, "shortdescription", type="string").text = itemPower.shortdescription
 
 	#Language List
 	languageListWrite = ET.SubElement(characterWrite, "languagelist")
@@ -1172,10 +1253,6 @@ def writeFantasyGroundsFile(character, outputFilename = None, outputType = None)
 		languageIDWrite = ET.SubElement(languageListWrite, langaugeIDText)
 		languageName = languageElement.get("name")
 		ET.SubElement(languageIDWrite, "name", type="string").text = languageName
-
-	#Level and Level Bonus (1/2 level)
-	ET.SubElement(characterWrite, "level", type="number").text = character.level
-	ET.SubElement(characterWrite, "levelbonus", type="number").text = str(character.levelBonus)
 
 	#Name
 	nameWrite = ET.SubElement(characterWrite, "name", type="string").text = character.characterName
@@ -1324,8 +1401,39 @@ def writeFantasyGroundsFile(character, outputFilename = None, outputType = None)
 	#Temporary HP
 	ET.SubElement(characterWrite, "temp")
 
+	damageTypesList = ["acid", "cold", "disease", "fire", "force", "lightning", "necrotic", "poison", "psychic", "radiant", "thunder"]
+
 	#Weapon List
 	weaponListWrite = ET.SubElement(characterWrite, "weaponlist")
+	weaponListID = 1
+	for weaponListEntry in weaponList:
+		if weaponListEntry.carried == "2":
+			weaponListID += 1
+			weaponListIDText = "id-0000" + str(weaponListID)
+			weaponListIDWrite = ET.SubElement(weaponListWrite, weaponListIDText)
+			damageTypeMatches = [word for word in damageTypesList if word.lower() in weaponListEntry.critical.lower()]
+			firstDamageTypeMatch = ""
+			if damageTypeMatches:
+				firstDamageTypeMatch = damageTypeMatches[0]
+			ET.SubElement(weaponListIDWrite, "ammo", type="number").text = "0"
+			ET.SubElement(weaponListIDWrite, "attackdef", type="string").text = "ac"
+			ET.SubElement(weaponListIDWrite, "bonus", type="number").text = str(int(weaponListEntry.proficiencyBonus) + int(weaponListEntry.bonus))
+			ET.SubElement(weaponListIDWrite, "criticalbonus", type="number").text = "0"
+			ET.SubElement(weaponListIDWrite, "criticaldamagetype", type="string").text = firstDamageTypeMatch
+			ET.SubElement(weaponListIDWrite, "criticaldice", type="dice").text = regularExpression.search(r'(\d+d\d+)', weaponListEntry.critical)
+			ET.SubElement(weaponListIDWrite, "damagebonus", type="number").text = str(weaponListEntry.bonus)
+			itemDamageMatch = regularExpression.search(r'(\d+d\d+)', weaponListEntry.itemDamage)
+			if itemDamageMatch:
+				ET.SubElement(weaponListIDWrite, "damagedice", type="dice").text = itemDamageMatch.group(1)
+			ET.SubElement(weaponListIDWrite, "isidentified", type="number").text = "1"
+			ET.SubElement(weaponListIDWrite, "maxammo", type="number").text = "0"
+			ET.SubElement(weaponListIDWrite, "name", type="string").text = weaponListEntry.itemName
+			ET.SubElement(weaponListIDWrite, "order", type="number").text = str(weaponListID-1)
+			ET.SubElement(weaponListIDWrite, "rangeincrement", type="number").text = weaponListEntry.range
+			weaponListShortcutWrite = ET.SubElement(weaponListIDWrite, "shortcut", type="windowreference")
+			ET.SubElement(weaponListShortcutWrite, "class").text = "item"
+			ET.SubElement(weaponListShortcutWrite, "recordname").text = "....inventorylist." + weaponListEntry.recordname
+			ET.SubElement(weaponListIDWrite, "type", type="number").text = "0"
 	
 	#Weight
 	ET.SubElement(characterWrite, "weight", type="string").text = character.weight
@@ -1338,12 +1446,12 @@ def writeFantasyGroundsFile(character, outputFilename = None, outputType = None)
 	ET.indent(tree, space="\t", level=0)
 	tree.write(outputFilename)
 
-# def main() -> int:
-# 	character = readCBLoaderCharacterFile("static/uploads/Ven_Tanymere.dnd4e")
-# 	readCBLoaderMainFile(character)
-# 	writeFantasyGroundsFile(character, None, "linkedDataOption")
-# 	return 0
+def main() -> int:
+	character = readCBLoaderCharacterFile("static/uploads/Cleric McClericFace.dnd4e")
+	readCBLoaderMainFile(character)
+	writeFantasyGroundsFile(character, None, "linkedDataOption")
+	return 0
 
 
-# if __name__ == '__main__':
-# 	sys.exit(main())  # next section explains the use of sys.exit
+if __name__ == '__main__':
+	sys.exit(main())  # next section explains the use of sys.exit
